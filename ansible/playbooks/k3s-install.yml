@@ -1,0 +1,67 @@
+---
+# K3s installation playbook
+# Run with: task k3s:install
+
+- name: Install K3s
+  hosts: all
+  become: true
+
+  vars:
+    k3s_version: "{{ hostvars[inventory_hostname]['k3s_version'] | default('v1.29.0+k3s1') }}"
+    k3s_server_args: "{{ hostvars[inventory_hostname]['k3s_server_args'] | default('--write-kubeconfig-mode 644') }}"
+
+  tasks:
+    - name: Check if K3s is already installed
+      stat:
+        path: /usr/local/bin/k3s
+      register: k3s_binary
+
+    - name: Download K3s install script
+      get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install.sh
+        mode: '0755'
+      when: not k3s_binary.stat.exists
+
+    - name: Install K3s
+      shell: |
+        INSTALL_K3S_VERSION="{{ k3s_version }}" /tmp/k3s-install.sh {{ k3s_server_args }}
+      args:
+        creates: /usr/local/bin/k3s
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+      when: not k3s_binary.stat.exists
+
+    - name: Wait for K3s to be ready
+      shell: kubectl get nodes
+      register: k3s_ready
+      until: k3s_ready.rc == 0
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Create .kube directory for pi user
+      file:
+        path: /home/pi/.kube
+        state: directory
+        owner: pi
+        group: pi
+        mode: '0755'
+
+    - name: Copy kubeconfig to pi user
+      copy:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: /home/pi/.kube/config
+        remote_src: yes
+        owner: pi
+        group: pi
+        mode: '0600'
+
+    - name: Display node status
+      shell: kubectl get nodes -o wide
+      register: node_status
+      changed_when: false
+
+    - name: Show node status
+      debug:
+        var: node_status.stdout_lines

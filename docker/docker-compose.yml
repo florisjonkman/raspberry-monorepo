@@ -1,0 +1,117 @@
+version: '3.8'
+
+# Local development environment
+# Mimics the production Kubernetes setup using Docker Compose
+
+services:
+  # ==========================================================================
+  # Observability Stack
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+      - prometheus
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+
+  # ==========================================================================
+  # Infrastructure Services
+  # ==========================================================================
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - web
+      - monitoring
+
+  # ==========================================================================
+  # Application Services
+  # Add your application services here
+  # ==========================================================================
+  # example-app:
+  #   build:
+  #     context: ../apps/example-app
+  #     dockerfile: Dockerfile
+  #   container_name: example-app
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     - NODE_ENV=development
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.example-app.rule=Host(`example-app.localhost`)"
+  #   networks:
+  #     - web
+
+networks:
+  monitoring:
+    driver: bridge
+  web:
+    driver: bridge
+
+volumes:
+  grafana-data:
+  loki-data:
+  prometheus-data:

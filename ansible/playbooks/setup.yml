@@ -1,0 +1,83 @@
+---
+# Initial Raspberry Pi setup playbook
+# Run with: task pi:setup
+
+- name: Setup Raspberry Pi
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+      register: apt_upgrade
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - htop
+          - iotop
+          - net-tools
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Check if cgroup settings are in cmdline.txt
+      slurp:
+        src: /boot/firmware/cmdline.txt
+      register: cmdline_content
+      ignore_errors: yes
+
+    - name: Check legacy cmdline.txt location
+      slurp:
+        src: /boot/cmdline.txt
+      register: cmdline_content_legacy
+      when: cmdline_content.failed | default(false)
+      ignore_errors: yes
+
+    - name: Set cmdline path
+      set_fact:
+        cmdline_path: "{{ '/boot/firmware/cmdline.txt' if not (cmdline_content.failed | default(false)) else '/boot/cmdline.txt' }}"
+
+    - name: Add cgroup settings to cmdline.txt
+      lineinfile:
+        path: "{{ cmdline_path }}"
+        backrefs: yes
+        regexp: '^(.*)$'
+        line: '\1 cgroup_memory=1 cgroup_enable=memory'
+      when: "'cgroup_memory=1' not in (cmdline_content.content | default(cmdline_content_legacy.content) | b64decode)"
+      register: cgroup_updated
+      notify: Reboot required
+
+    - name: Enable IP forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
+
+    - name: Set hostname
+      hostname:
+        name: "{{ inventory_hostname }}"
+
+    - name: Add hostname to /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1'
+        line: "127.0.1.1\t{{ inventory_hostname }}"
+
+  handlers:
+    - name: Reboot required
+      debug:
+        msg: "Reboot required for cgroup changes. Run: ansible-playbook -i inventory/hosts.yml playbooks/reboot.yml"

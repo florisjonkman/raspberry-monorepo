@@ -1,0 +1,77 @@
+# Prometheus Helm values
+# Chart: prometheus-community/prometheus
+# https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus
+
+server:
+  persistentVolume:
+    enabled: true
+    size: 5Gi
+    storageClass: local-path
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  retention: "7d"
+
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts:
+      - prometheus.pi.local
+    tls:
+      - secretName: prometheus-tls
+        hosts:
+          - prometheus.pi.local
+
+alertmanager:
+  enabled: true
+  persistentVolume:
+    enabled: true
+    size: 1Gi
+    storageClass: local-path
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Node exporter for hardware metrics
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# Pushgateway - disabled to save resources
+pushgateway:
+  enabled: false
+
+# Kube-state-metrics for Kubernetes object metrics
+kube-state-metrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Additional scrape configs
+extraScrapeConfigs: |
+  # Scrape Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik.kube-system.svc.cluster.local:9100']

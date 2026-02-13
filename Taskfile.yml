@@ -1,0 +1,176 @@
+# https://taskfile.dev
+
+version: '3'
+
+vars:
+  PI_HOST: raspberrypi.local
+  KUBECONFIG: ~/.kube/config-pi
+
+env:
+  KUBECONFIG: '{{.KUBECONFIG}}'
+
+tasks:
+  # ============================================================================
+  # Development
+  # ============================================================================
+  dev:
+    desc: Start local development environment
+    dir: docker
+    cmds:
+      - docker compose up -d
+
+  down:
+    desc: Stop local development environment
+    dir: docker
+    cmds:
+      - docker compose down
+
+  logs:
+    desc: View local development logs
+    dir: docker
+    cmds:
+      - docker compose logs -f
+
+  # ============================================================================
+  # Build
+  # ============================================================================
+  build:
+    desc: Build all applications
+    cmds:
+      - pnpm build
+
+  build:docker:
+    desc: Build Docker images for all apps
+    cmds:
+      - |
+        for app in apps/*/; do
+          if [ -f "$app/Dockerfile" ]; then
+            app_name=$(basename $app)
+            echo "Building $app_name..."
+            docker build -t $app_name:local $app
+          fi
+        done
+
+  # ============================================================================
+  # Raspberry Pi Setup
+  # ============================================================================
+  pi:setup:
+    desc: Initial Raspberry Pi setup via Ansible
+    dir: ansible
+    cmds:
+      - ansible-playbook -i inventory/hosts.yml playbooks/setup.yml
+
+  pi:ping:
+    desc: Test connection to Raspberry Pi
+    dir: ansible
+    cmds:
+      - ansible -i inventory/hosts.yml all -m ping
+
+  pi:ssh:
+    desc: SSH into Raspberry Pi
+    cmds:
+      - ssh pi@{{.PI_HOST}}
+
+  # ============================================================================
+  # K3s
+  # ============================================================================
+  k3s:install:
+    desc: Install K3s on Raspberry Pi
+    dir: ansible
+    cmds:
+      - ansible-playbook -i inventory/hosts.yml playbooks/k3s-install.yml
+
+  k3s:uninstall:
+    desc: Uninstall K3s from Raspberry Pi
+    cmds:
+      - ssh pi@{{.PI_HOST}} '/usr/local/bin/k3s-uninstall.sh'
+
+  k3s:kubeconfig:
+    desc: Fetch kubeconfig from Raspberry Pi
+    cmds:
+      - |
+        ssh pi@{{.PI_HOST}} 'sudo cat /etc/rancher/k3s/k3s.yaml' | \
+        sed "s/127.0.0.1/{{.PI_HOST}}/g" > ~/.kube/config-pi
+      - chmod 600 ~/.kube/config-pi
+      - echo "Kubeconfig saved to ~/.kube/config-pi"
+      - echo "Run: export KUBECONFIG=~/.kube/config-pi"
+
+  # ============================================================================
+  # ArgoCD
+  # ============================================================================
+  argocd:install:
+    desc: Install ArgoCD on the cluster
+    cmds:
+      - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl apply -n argocd -f infrastructure/argocd/install/
+
+  argocd:password:
+    desc: Get ArgoCD admin password
+    cmds:
+      - |
+        kubectl -n argocd get secret argocd-initial-admin-secret \
+          -o jsonpath="{.data.password}" | base64 -d && echo
+
+  argocd:port-forward:
+    desc: Port forward ArgoCD UI to localhost:8080
+    cmds:
+      - kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+  # ============================================================================
+  # Observability
+  # ============================================================================
+  grafana:port-forward:
+    desc: Port forward Grafana to localhost:3000
+    cmds:
+      - kubectl port-forward svc/grafana -n monitoring 3000:80
+
+  prometheus:port-forward:
+    desc: Port forward Prometheus to localhost:9090
+    cmds:
+      - kubectl port-forward svc/prometheus-server -n monitoring 9090:80
+
+  # ============================================================================
+  # Kubernetes Utilities
+  # ============================================================================
+  k:pods:
+    desc: List all pods
+    cmds:
+      - kubectl get pods -A
+
+  k:nodes:
+    desc: List all nodes
+    cmds:
+      - kubectl get nodes -o wide
+
+  k:top:
+    desc: Show resource usage
+    cmds:
+      - kubectl top nodes
+      - kubectl top pods -A --sort-by=memory | head -20
+
+  # ============================================================================
+  # Secrets
+  # ============================================================================
+  sops:encrypt:
+    desc: Encrypt a secrets file with SOPS
+    cmds:
+      - sops -e {{.CLI_ARGS}} > {{.CLI_ARGS}}.enc.yaml
+
+  sops:edit:
+    desc: Edit an encrypted secrets file
+    cmds:
+      - sops {{.CLI_ARGS}}
+
+  # ============================================================================
+  # Maintenance
+  # ============================================================================
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - pnpm clean
+      - rm -rf node_modules/.cache
+
+  prune:
+    desc: Prune unused Docker resources
+    cmds:
+      - docker system prune -af

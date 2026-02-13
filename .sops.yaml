@@ -1,0 +1,12 @@
+# SOPS configuration
+# Replace <YOUR_AGE_PUBLIC_KEY> with your age public key
+# Generate with: age-keygen -o ~/.config/sops/age/keys.txt
+
+creation_rules:
+  # Encrypt all files ending with .enc.yaml
+  - path_regex: \.enc\.yaml$
+    age: <YOUR_AGE_PUBLIC_KEY>
+
+  # Encrypt secrets in infrastructure
+  - path_regex: infrastructure/.*secrets.*\.yaml$
+    age: <YOUR_AGE_PUBLIC_KEY>

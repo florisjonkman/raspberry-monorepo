@@ -1,0 +1,63 @@
+# Traefik Helm values
+# Chart: traefik/traefik
+# https://github.com/traefik/traefik-helm-chart
+
+deployment:
+  replicas: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 300m
+    memory: 256Mi
+
+# Enable dashboard
+ingressRoute:
+  dashboard:
+    enabled: true
+
+# Ports configuration
+ports:
+  web:
+    port: 8000
+    exposedPort: 80
+    protocol: TCP
+  websecure:
+    port: 8443
+    exposedPort: 443
+    protocol: TCP
+    tls:
+      enabled: true
+  metrics:
+    port: 9100
+    exposedPort: 9100
+    protocol: TCP
+
+# Service configuration - use LoadBalancer with K3s
+service:
+  enabled: true
+  type: LoadBalancer
+  spec:
+    loadBalancerIP: ""  # Will use Pi's IP
+
+# Enable Prometheus metrics
+metrics:
+  prometheus:
+    entryPoint: metrics
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
+# Logs
+logs:
+  general:
+    level: INFO
+  access:
+    enabled: true
+    format: json
+
+# Additional arguments
+additionalArguments:
+  - "--api.insecure=true"
+  - "--serversTransport.insecureSkipVerify=true"

@@ -1,0 +1,142 @@
+# Observability Stack Application
+# Manages Grafana, Loki, Promtail, and Prometheus
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-namespace
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    targetRevision: main
+    path: infrastructure/argocd/applications/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: 25.8.0
+    chart: prometheus
+    helm:
+      valueFiles:
+        - $values/infrastructure/helm-values/prometheus.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      targetRevision: 25.8.0
+      chart: prometheus
+      helm:
+        valueFiles:
+          - $values/infrastructure/helm-values/prometheus.yaml
+    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+      targetRevision: main
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 6.2.0
+      chart: loki
+      helm:
+        valueFiles:
+          - $values/infrastructure/helm-values/loki.yaml
+    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: promtail
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 6.15.3
+      chart: promtail
+      helm:
+        valueFiles:
+          - $values/infrastructure/helm-values/promtail.yaml
+    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 7.2.0
+      chart: grafana
+      helm:
+        valueFiles:
+          - $values/infrastructure/helm-values/grafana.yaml
+    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
