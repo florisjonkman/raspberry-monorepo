@@ -1,9 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init:*)",
-      "Bash(git branch:*)",
-      "Bash(chmod:*)"
+      "Bash(*)",
+      "Fetch(*)"
     ]
   }
 }
