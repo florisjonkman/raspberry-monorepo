@@ -18,17 +18,17 @@ WARNINGS=0
 # Helper functions
 pass() {
     echo -e "${GREEN}[PASS]${NC} $1"
-    ((PASSED++))
+    PASSED=$((PASSED + 1))
 }
 
 fail() {
     echo -e "${RED}[FAIL]${NC} $1"
-    ((FAILED++))
+    FAILED=$((FAILED + 1))
 }
 
 warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
-    ((WARNINGS++))
+    WARNINGS=$((WARNINGS + 1))
 }
 
 info() {
