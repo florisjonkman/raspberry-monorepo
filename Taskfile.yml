@@ -220,6 +220,17 @@ tasks:
   # ============================================================================
   # ArgoCD
   # ============================================================================
+  secrets:create:
+    desc: Create shared secrets from .env file
+    dotenv: ['.env']
+    cmds:
+      - |
+        kubectl create secret generic shared-credentials \
+          --from-literal=admin-user=admin \
+          --from-literal=admin-password=${SERVICES_PASSWORD} \
+          -n monitoring --dry-run=client -o yaml | kubectl apply -f -
+      - echo "Shared credentials secret created in monitoring namespace"
+
   argocd:install:
     desc: Install ArgoCD on the cluster
     cmds:
