@@ -18,7 +18,11 @@ persistence:
   storageClassName: local-path
 
 adminUser: admin
-# adminPassword is set via secret
+# Password from shared secret
+admin:
+  existingSecret: shared-credentials
+  userKey: admin-user
+  passwordKey: admin-password
 
 ingress:
   enabled: true
