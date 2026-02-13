@@ -136,12 +136,62 @@ task k:nodes              # List nodes
 task k:validate           # Run cluster validation
 ```
 
-## Workflow
+## Deployment Flows
+
+### Local Development (K3d)
+
+Test the full stack locally before deploying to Pi:
+
+```bash
+# 1. Delete existing local cluster (if any)
+task k3d:delete
+
+# 2. Create fresh cluster
+task k3d:create
+
+# 3. Deploy the observability stack
+task local:deploy
+
+# 4. Validate deployment
+task local:test
+```
+
+Expected result: 9 checks passed, 1 warning (ArgoCD not installed locally).
+
+### Raspberry Pi Deployment (Full Reset)
+
+Complete flow to deploy from scratch on the Pi:
+
+```bash
+# 1. Wipe existing K3s installation
+ssh pi@192.168.1.31 'sudo /usr/local/bin/k3s-uninstall.sh'
+
+# 2. Install K3s via Ansible
+task k3s:install
+
+# 3. Fetch kubeconfig (saved to ~/.kube/config-pi)
+task k3s:kubeconfig
+
+# 4. Set kubeconfig for subsequent commands
+export KUBECONFIG=~/.kube/config-pi
+
+# 5. Install ArgoCD
+task argocd:install
+
+# 6. Create shared secrets
+task secrets:create
+
+# 7. Apply root application (triggers GitOps)
+kubectl apply -f infrastructure/argocd/applications/root.yaml
+
+# 8. Watch deployment progress
+kubectl get pods -A -w
+```
 
 ### Making Changes
 
 1. **Edit files** in the repository
-2. **Test locally** (optional):
+2. **Test locally** (recommended):
    ```bash
    task k3d:create
    task local:deploy
@@ -160,11 +210,7 @@ task k:validate           # Run cluster validation
 3. Configure router DHCP reservation for `192.168.1.31`
 4. Copy SSH key: `ssh-copy-id pi@192.168.1.31`
 5. Setup Pi: `task pi:setup`
-6. Install K3s: `task k3s:install`
-7. Get kubeconfig: `task k3s:kubeconfig`
-8. Install ArgoCD: `task argocd:install`
-9. Create secrets: Copy `.env.example` to `.env`, edit, then `task secrets:create`
-10. Apply root app: `kubectl apply -f infrastructure/argocd/applications/root.yaml`
+6. Follow the "Raspberry Pi Deployment" steps above
 
 ## Hardware
 
@@ -207,3 +253,70 @@ The stack is optimized for Raspberry Pi's limited resources:
 - All components have conservative resource limits
 - Persistence uses K3s local-path provisioner
 - Alertmanager and Pushgateway can be disabled if needed
+
+## Kubeconfig Management
+
+The Pi kubeconfig is stored separately from your default kubeconfig:
+
+```bash
+# Kubeconfig is saved to ~/.kube/config-pi
+task k3s:kubeconfig
+
+# Option 1: Export for session
+export KUBECONFIG=~/.kube/config-pi
+kubectl get nodes
+
+# Option 2: Use inline for single commands
+KUBECONFIG=~/.kube/config-pi kubectl get nodes
+
+# Option 3: Switch back to default
+unset KUBECONFIG
+```
+
+## Accessing Services
+
+### On Pi Cluster
+
+```bash
+export KUBECONFIG=~/.kube/config-pi
+
+# Grafana (http://localhost:3000)
+# Login: admin / <password from .env>
+task grafana:port-forward
+
+# Prometheus (http://localhost:9090)
+task prometheus:port-forward
+
+# ArgoCD (https://localhost:8080)
+# Login: admin / <run task argocd:password>
+task argocd:port-forward
+```
+
+### On Local Cluster
+
+```bash
+# Ensure local context is active (usually automatic with K3d)
+kubectl config use-context k3d-k3s-local
+
+# Same port-forward commands work
+task grafana:port-forward
+task prometheus:port-forward
+```
+
+## Troubleshooting
+
+### ArgoCD Large CRD Error
+If you see "metadata.annotations: Too long" during ArgoCD install, the task already uses `--server-side` apply which handles this.
+
+### Loki Filesystem Error
+If Loki fails with "read-only file system" errors, ensure the helm values have proper volume mounts. Local config uses emptyDir, production uses PVC.
+
+### Kubeconfig Context Not Found
+If `kubectl config use-context pi-cluster` fails, the kubeconfig may not have been fetched correctly. Re-run `task k3s:kubeconfig`.
+
+### Pods Stuck in Pending
+Check for resource constraints on the Pi:
+```bash
+kubectl describe pod <pod-name> -n <namespace>
+kubectl top nodes
+```
