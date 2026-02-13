@@ -88,22 +88,26 @@ services:
 
   # ==========================================================================
   # Application Services
-  # Add your application services here
   # ==========================================================================
-  # example-app:
-  #   build:
-  #     context: ../apps/example-app
-  #     dockerfile: Dockerfile
-  #   container_name: example-app
-  #   ports:
-  #     - "3001:3000"
-  #   environment:
-  #     - NODE_ENV=development
-  #   labels:
-  #     - "traefik.enable=true"
-  #     - "traefik.http.routers.example-app.rule=Host(`example-app.localhost`)"
-  #   networks:
-  #     - web
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw
+    ports:
+      - "18789:18789"
+    environment:
+      - OPENCLAW_PORT=18789
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+    volumes:
+      - openclaw-config:/root/.openclaw
+      - openclaw-workspace:/root/openclaw/workspace
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openclaw.rule=Host(`openclaw.localhost`)"
+      - "traefik.http.services.openclaw.loadbalancer.server.port=18789"
+    networks:
+      - web
+    restart: unless-stopped
 
 networks:
   monitoring:
@@ -115,3 +119,5 @@ volumes:
   grafana-data:
   loki-data:
   prometheus-data:
+  openclaw-config:
+  openclaw-workspace:
