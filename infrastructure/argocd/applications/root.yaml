@@ -11,7 +11,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman with your GitHub username
     targetRevision: main
     path: infrastructure/argocd/applications
     directory:

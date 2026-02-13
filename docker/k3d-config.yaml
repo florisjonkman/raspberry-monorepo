@@ -1,0 +1,62 @@
+# K3d Configuration
+# Creates a local K3s cluster that mirrors the Raspberry Pi production setup
+# Usage: k3d cluster create --config docker/k3d-config.yaml
+
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: k3s-local
+
+servers: 1
+agents: 0
+
+image: rancher/k3s:v1.29.0-k3s1
+
+ports:
+  # HTTP - map to localhost:80
+  - port: 80:80
+    nodeFilters:
+      - loadbalancer
+  # HTTPS - map to localhost:443
+  - port: 443:443
+    nodeFilters:
+      - loadbalancer
+  # K3s API - map to localhost:6443
+  - port: 6443:6443
+    nodeFilters:
+      - loadbalancer
+
+options:
+  k3d:
+    wait: true
+    timeout: "120s"
+  k3s:
+    extraArgs:
+      # Disable default Traefik - we install our own
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      # Disable ServiceLB - we use NodePort locally
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+      # Make kubeconfig accessible
+      - arg: --write-kubeconfig-mode=644
+        nodeFilters:
+          - server:*
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
+
+# Local registry for testing custom images
+# Using port 5050 to avoid conflict with macOS AirPlay Receiver on port 5000
+registries:
+  create:
+    name: registry.localhost
+    host: "0.0.0.0"
+    hostPort: "5050"
+  config: |
+    mirrors:
+      "registry.localhost:5050":
+        endpoint:
+          - http://registry.localhost:5050

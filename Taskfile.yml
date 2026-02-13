@@ -3,8 +3,9 @@
 version: '3'
 
 vars:
-  PI_HOST: raspberrypi.local
+  PI_HOST: 192.168.1.31
   KUBECONFIG: ~/.kube/config-pi
+  K3D_CLUSTER: k3s-local
 
 env:
   KUBECONFIG: '{{.KUBECONFIG}}'
@@ -52,6 +53,121 @@ tasks:
         done
 
   # ============================================================================
+  # K3d (Local Kubernetes)
+  # ============================================================================
+  k3d:create:
+    desc: Create local K3s cluster with K3d
+    cmds:
+      - k3d cluster create --config docker/k3d-config.yaml
+      - echo "Local cluster '{{.K3D_CLUSTER}}' created"
+      - echo "Kubeconfig automatically updated"
+
+  k3d:delete:
+    desc: Delete local K3s cluster
+    cmds:
+      - k3d cluster delete {{.K3D_CLUSTER}}
+      - echo "Local cluster '{{.K3D_CLUSTER}}' deleted"
+
+  k3d:start:
+    desc: Start local K3s cluster
+    cmds:
+      - k3d cluster start {{.K3D_CLUSTER}}
+
+  k3d:stop:
+    desc: Stop local K3s cluster
+    cmds:
+      - k3d cluster stop {{.K3D_CLUSTER}}
+
+  k3d:list:
+    desc: List K3d clusters
+    cmds:
+      - k3d cluster list
+
+  # ============================================================================
+  # Local Deployment
+  # ============================================================================
+  local:deploy:
+    desc: Deploy full observability stack to local cluster
+    cmds:
+      - task: local:deploy:traefik
+      - task: local:deploy:prometheus
+      - task: local:deploy:loki
+      - task: local:deploy:promtail
+      - task: local:deploy:grafana
+      - 'echo "Stack deployed! Run task local:test to validate"'
+
+  local:deploy:traefik:
+    desc: Deploy Traefik to local cluster
+    cmds:
+      - helm repo add traefik https://traefik.github.io/charts || true
+      - helm repo update
+      - |
+        helm upgrade --install traefik traefik/traefik \
+          -n kube-system \
+          -f infrastructure/helm-values/local/traefik.yaml \
+          --wait
+
+  local:deploy:prometheus:
+    desc: Deploy Prometheus to local cluster
+    cmds:
+      - helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+      - helm repo update
+      - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+      - |
+        helm upgrade --install prometheus prometheus-community/prometheus \
+          -n monitoring \
+          -f infrastructure/helm-values/local/prometheus.yaml \
+          --wait
+
+  local:deploy:loki:
+    desc: Deploy Loki to local cluster
+    cmds:
+      - helm repo add grafana https://grafana.github.io/helm-charts || true
+      - helm repo update
+      - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+      - |
+        helm upgrade --install loki grafana/loki \
+          -n monitoring \
+          -f infrastructure/helm-values/local/loki.yaml \
+          --wait
+
+  local:deploy:promtail:
+    desc: Deploy Promtail to local cluster
+    cmds:
+      - helm repo add grafana https://grafana.github.io/helm-charts || true
+      - helm repo update
+      - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+      - |
+        helm upgrade --install promtail grafana/promtail \
+          -n monitoring \
+          -f infrastructure/helm-values/local/promtail.yaml \
+          --wait
+
+  local:deploy:grafana:
+    desc: Deploy Grafana to local cluster
+    cmds:
+      - helm repo add grafana https://grafana.github.io/helm-charts || true
+      - helm repo update
+      - kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+      - |
+        helm upgrade --install grafana grafana/grafana \
+          -n monitoring \
+          -f infrastructure/helm-values/local/grafana.yaml \
+          --wait
+
+  local:test:
+    desc: Validate local cluster deployment
+    cmds:
+      - ./scripts/validate-cluster.sh
+
+  local:reset:
+    desc: Delete and recreate local cluster
+    cmds:
+      - task: k3d:delete
+      - task: k3d:create
+      - echo "Cluster reset complete"
+
+  # ============================================================================
   # Raspberry Pi Setup
   # ============================================================================
   pi:setup:
@@ -70,6 +186,12 @@ tasks:
     desc: SSH into Raspberry Pi
     cmds:
       - ssh pi@{{.PI_HOST}}
+
+  pi:reboot:
+    desc: Reboot Raspberry Pi via Ansible
+    dir: ansible
+    cmds:
+      - ansible-playbook -i inventory/hosts.yml playbooks/reboot.yml
 
   # ============================================================================
   # K3s
@@ -93,7 +215,7 @@ tasks:
         sed "s/127.0.0.1/{{.PI_HOST}}/g" > ~/.kube/config-pi
       - chmod 600 ~/.kube/config-pi
       - echo "Kubeconfig saved to ~/.kube/config-pi"
-      - echo "Run: export KUBECONFIG=~/.kube/config-pi"
+      - 'echo "Run: export KUBECONFIG=~/.kube/config-pi"'
 
   # ============================================================================
   # ArgoCD
@@ -102,7 +224,9 @@ tasks:
     desc: Install ArgoCD on the cluster
     cmds:
       - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-      - kubectl apply -n argocd -f infrastructure/argocd/install/
+      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - echo "Waiting for ArgoCD to be ready..."
+      - kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
 
   argocd:password:
     desc: Get ArgoCD admin password
@@ -147,6 +271,11 @@ tasks:
     cmds:
       - kubectl top nodes
       - kubectl top pods -A --sort-by=memory | head -20
+
+  k:validate:
+    desc: Validate cluster deployment
+    cmds:
+      - ./scripts/validate-cluster.sh
 
   # ============================================================================
   # Secrets

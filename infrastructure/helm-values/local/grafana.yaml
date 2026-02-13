@@ -1,0 +1,69 @@
+# Grafana Helm values for local K3d development
+# Chart: grafana/grafana
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+persistence:
+  enabled: false  # No persistence needed locally
+
+adminUser: admin
+adminPassword: admin  # Simple password for local dev
+
+# NodePort for easy access
+service:
+  type: NodePort
+  nodePort: 30000
+
+# Disable ingress locally - use port-forward or NodePort
+ingress:
+  enabled: false
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        access: proxy
+        isDefault: true
+
+      - name: Loki
+        type: loki
+        url: http://loki.monitoring.svc.cluster.local:3100
+        access: proxy
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    # Kubernetes cluster monitoring
+    kubernetes-cluster:
+      gnetId: 315
+      revision: 3
+      datasource: Prometheus
+
+    # Node exporter
+    node-exporter:
+      gnetId: 1860
+      revision: 33
+      datasource: Prometheus

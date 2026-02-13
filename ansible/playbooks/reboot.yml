@@ -1,0 +1,43 @@
+---
+# Reboot Raspberry Pi playbook
+# Run with: ansible-playbook -i inventory/hosts.yml playbooks/reboot.yml
+
+- name: Reboot Raspberry Pi
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Reboot the Pi
+      reboot:
+        msg: "Rebooting for system changes"
+        pre_reboot_delay: 5
+        post_reboot_delay: 30
+        reboot_timeout: 300
+        connect_timeout: 5
+        test_command: uptime
+
+    - name: Wait for system to stabilize
+      wait_for_connection:
+        delay: 10
+        timeout: 120
+
+    - name: Check cgroups v2 (unified)
+      command: cat /sys/fs/cgroup/cgroup.controllers
+      register: cgroups_v2
+      changed_when: false
+
+    - name: Verify memory cgroup is enabled
+      assert:
+        that:
+          - "'memory' in cgroups_v2.stdout"
+        fail_msg: "Memory cgroup is not enabled. Check /boot/firmware/cmdline.txt"
+        success_msg: "Memory cgroup is enabled (cgroups v2)"
+
+    - name: Display uptime
+      command: uptime
+      register: uptime_output
+      changed_when: false
+
+    - name: Show uptime
+      debug:
+        msg: "System uptime: {{ uptime_output.stdout }}"

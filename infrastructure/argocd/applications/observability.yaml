@@ -9,7 +9,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman
     targetRevision: main
     path: infrastructure/argocd/applications/monitoring
   destination:
@@ -47,7 +47,7 @@ spec:
       helm:
         valueFiles:
           - $values/infrastructure/helm-values/prometheus.yaml
-    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    - repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman
       targetRevision: main
       ref: values
   syncPolicy:
@@ -72,7 +72,7 @@ spec:
       helm:
         valueFiles:
           - $values/infrastructure/helm-values/loki.yaml
-    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    - repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman
       targetRevision: main
       ref: values
   destination:
@@ -100,7 +100,7 @@ spec:
       helm:
         valueFiles:
           - $values/infrastructure/helm-values/promtail.yaml
-    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    - repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman
       targetRevision: main
       ref: values
   destination:
@@ -128,7 +128,7 @@ spec:
       helm:
         valueFiles:
           - $values/infrastructure/helm-values/grafana.yaml
-    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    - repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman
       targetRevision: main
       ref: values
   destination:

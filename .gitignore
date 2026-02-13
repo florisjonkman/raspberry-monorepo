@@ -56,7 +56,11 @@ keys.txt
 # Docker
 .docker/
 
+
 # Misc
 tmp/
 temp/
 .cache/
+
+#
+~

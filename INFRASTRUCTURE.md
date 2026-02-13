@@ -4,6 +4,9 @@ This document details the infrastructure setup for the Raspberry Pi Kubernetes c
 
 ## Table of Contents
 
+- [Quick Start](#quick-start)
+- [SD Card Flashing](#sd-card-flashing)
+- [Local Development](#local-development)
 - [Raspberry Pi Setup](#raspberry-pi-setup)
 - [K3s Installation](#k3s-installation)
 - [Networking](#networking)
@@ -12,6 +15,111 @@ This document details the infrastructure setup for the Raspberry Pi Kubernetes c
 - [Observability Stack](#observability-stack)
 - [Secret Management](#secret-management)
 - [Maintenance](#maintenance)
+
+---
+
+## Quick Start
+
+### Local Testing (Recommended First)
+
+```bash
+# 1. Create local K3d cluster
+task k3d:create
+
+# 2. Deploy observability stack
+task local:deploy
+
+# 3. Validate deployment
+task local:test
+
+# 4. Access services
+task grafana:port-forward    # http://localhost:3000
+task prometheus:port-forward # http://localhost:9090
+```
+
+### Raspberry Pi Deployment
+
+```bash
+# 1. Flash SD card (see docs/SETUP_PI.md)
+# 2. Configure static IP via router DHCP reservation
+
+# 3. Test connectivity
+task pi:ping
+
+# 4. Setup Pi
+task pi:setup
+
+# 5. Install K3s
+task k3s:install
+
+# 6. Get kubeconfig
+task k3s:kubeconfig
+export KUBECONFIG=~/.kube/config-pi
+
+# 7. Install ArgoCD
+task argocd:install
+
+# 8. Validate
+task k:validate
+```
+
+---
+
+## SD Card Flashing
+
+For detailed instructions, see [docs/SETUP_PI.md](docs/SETUP_PI.md).
+
+### Summary
+
+1. **Install Raspberry Pi Imager**: `brew install --cask raspberry-pi-imager`
+2. **Flash SD card** with Raspberry Pi OS Lite (64-bit)
+3. **Configure via Imager**:
+   - Hostname: `raspberry`
+   - Enable SSH
+   - Set username/password
+4. **Boot Pi** with Ethernet connected
+5. **Configure router** DHCP reservation for `192.168.1.31`
+6. **Reboot Pi** to get static IP
+
+---
+
+## Local Development
+
+For detailed instructions, see [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md).
+
+### Prerequisites
+
+```bash
+brew install k3d kubectl helm go-task
+```
+
+### Workflow
+
+```bash
+# Create cluster
+task k3d:create
+
+# Deploy stack
+task local:deploy
+
+# Validate
+task local:test
+
+# Cleanup
+task k3d:delete
+```
+
+### Available Tasks
+
+| Task | Description |
+|------|-------------|
+| `task k3d:create` | Create local K3s cluster |
+| `task k3d:delete` | Delete local cluster |
+| `task k3d:start` | Start stopped cluster |
+| `task k3d:stop` | Stop cluster (preserves data) |
+| `task local:deploy` | Deploy full observability stack |
+| `task local:test` | Validate deployment |
+| `task local:reset` | Delete and recreate cluster |
 
 ---
 
@@ -25,15 +133,28 @@ This document details the infrastructure setup for the Raspberry Pi Kubernetes c
 | FCC ID | 2ABCB-RPI4B |
 | IC | 20951-RPI4B |
 | Architecture | ARM64 (aarch64) |
+| RAM | 4GB (recommended 4GB+) |
+
+### Network Configuration
+
+| Setting | Value |
+|---------|-------|
+| Static IP | `192.168.1.31` (via DHCP reservation) |
+| Gateway | `192.168.1.1` |
+| SSH Port | 22 |
+| K3s API | 6443 |
+
+> Static IP is configured on the **router** via DHCP reservation, not on the Pi itself.
+> See [docs/SETUP_PI.md](docs/SETUP_PI.md) for detailed instructions.
 
 ### OS Installation
 
 1. Download [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-2. Select **Raspberry Pi OS Lite (64-bit)** or **Ubuntu Server 22.04 LTS (64-bit)**
+2. Select **Raspberry Pi OS Lite (64-bit)**
 3. Configure advanced options:
-   - Set hostname: `raspberrypi` (or your preferred name)
+   - Set hostname: `raspberry`
    - Enable SSH with public key authentication
-   - Configure WiFi (if not using Ethernet)
+   - Skip WiFi (use Ethernet)
    - Set locale and timezone
 
 ### Initial Configuration
@@ -129,19 +250,20 @@ Traefik is installed via Helm with custom values:
 Option 1: Local `/etc/hosts`
 
 ```
-192.168.x.x  argocd.pi.local grafana.pi.local prometheus.pi.local
+192.168.1.31  argocd.pi.local grafana.pi.local prometheus.pi.local
 ```
 
 Option 2: Local DNS server (Pi-hole, dnsmasq)
 
 ```
-address=/pi.local/192.168.x.x
+address=/pi.local/192.168.1.31
 ```
 
 Option 3: nip.io (no configuration needed)
 
 ```
-argocd.192.168.x.x.nip.io
+argocd.192.168.1.31.nip.io
+grafana.192.168.1.31.nip.io
 ```
 
 ### TLS Certificates

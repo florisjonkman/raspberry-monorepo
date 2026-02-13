@@ -1,17 +1,16 @@
-# Traefik Helm values
+# Traefik Helm values for local K3d development
 # Chart: traefik/traefik
-# https://github.com/traefik/traefik-helm-chart
 
 deployment:
   replicas: 1
 
 resources:
   requests:
-    cpu: 50m
-    memory: 64Mi
+    cpu: 25m
+    memory: 32Mi
   limits:
-    cpu: 300m
-    memory: 256Mi
+    cpu: 100m
+    memory: 128Mi
 
 # Enable dashboard
 ingressRoute:
@@ -33,12 +32,16 @@ ports:
     exposedPort: 9100
     protocol: TCP
 
-# Service configuration - use LoadBalancer with K3s
+# TLS configuration
+tlsStore:
+  default:
+    defaultCertificate:
+      secretName: ""
+
+# NodePort for local access via K3d port mapping
 service:
   enabled: true
-  type: LoadBalancer
-  spec:
-    loadBalancerIP: ""  # Will use Pi's IP
+  type: NodePort
 
 # Enable Prometheus metrics
 metrics:
@@ -50,7 +53,7 @@ metrics:
 # Logs
 logs:
   general:
-    level: INFO
+    level: DEBUG
   access:
     enabled: true
     format: json

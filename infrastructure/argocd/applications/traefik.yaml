@@ -14,7 +14,7 @@ spec:
       helm:
         valueFiles:
           - $values/infrastructure/helm-values/traefik.yaml
-    - repoURL: https://github.com/<your-username>/raspberry-monorepo.git  # UPDATE THIS
+    - repoURL: https://github.com/florisjonkman/raspberry-monorepo.git  # TODO: Replace florisjonkman
       targetRevision: main
       ref: values
   destination:

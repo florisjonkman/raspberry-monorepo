@@ -1,0 +1,58 @@
+# Prometheus Helm values for local K3d development
+# Chart: prometheus-community/prometheus
+
+server:
+  persistentVolume:
+    enabled: false  # No persistence needed locally
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  retention: "1d"  # Short retention for local dev
+
+  # NodePort for easy access
+  service:
+    type: NodePort
+    nodePort: 30090
+
+  # Disable ingress locally
+  ingress:
+    enabled: false
+
+alertmanager:
+  enabled: false  # Not needed for local dev
+
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 16Mi
+    limits:
+      cpu: 50m
+      memory: 32Mi
+
+pushgateway:
+  enabled: false
+
+kube-state-metrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Additional scrape configs
+extraScrapeConfigs: |
+  # Scrape Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik.kube-system.svc.cluster.local:9100']
