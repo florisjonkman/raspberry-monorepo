@@ -26,6 +26,7 @@ loki:
   limits_config:
     retention_period: 24h  # Short retention for local dev
 
+
 singleBinary:
   replicas: 1
   resources:
@@ -37,6 +38,12 @@ singleBinary:
       memory: 256Mi
   persistence:
     enabled: false  # No persistence for local dev
+  extraVolumes:
+    - name: var-loki
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: var-loki
+      mountPath: /var/loki
 
 # Disable components not needed for single binary mode
 backend:
@@ -47,6 +54,12 @@ write:
   replicas: 0
 
 gateway:
+  enabled: false
+
+# Disable caches - not needed for local dev and consume memory
+chunksCache:
+  enabled: false
+resultsCache:
   enabled: false
 
 # Disable monitoring

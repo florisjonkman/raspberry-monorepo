@@ -46,9 +46,6 @@ singleBinary:
     enabled: true
     size: 2Gi
     storageClassName: local-path
-  extraVolumeMounts:
-    - name: data
-      mountPath: /var/loki
 
 # Disable ALL extra components for minimal memory usage
 backend:

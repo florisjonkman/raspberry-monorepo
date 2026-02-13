@@ -4,11 +4,7 @@ version: '3'
 
 vars:
   PI_HOST: 192.168.1.31
-  KUBECONFIG: ~/.kube/config-pi
   K3D_CLUSTER: k3s-local
-
-env:
-  KUBECONFIG: '{{.KUBECONFIG}}'
 
 tasks:
   # ============================================================================
@@ -208,14 +204,17 @@ tasks:
       - ssh pi@{{.PI_HOST}} '/usr/local/bin/k3s-uninstall.sh'
 
   k3s:kubeconfig:
-    desc: Fetch kubeconfig from Raspberry Pi
+    desc: Fetch kubeconfig from Raspberry Pi to ~/.kube/config-pi
     cmds:
+      - mkdir -p ~/.kube
       - |
         ssh pi@{{.PI_HOST}} 'sudo cat /etc/rancher/k3s/k3s.yaml' | \
-        sed "s/127.0.0.1/{{.PI_HOST}}/g" > ~/.kube/config-pi
+        sed "s/127.0.0.1/{{.PI_HOST}}/g" | \
+        sed "s/default/pi-cluster/g" > ~/.kube/config-pi
       - chmod 600 ~/.kube/config-pi
       - echo "Kubeconfig saved to ~/.kube/config-pi"
-      - 'echo "Run: export KUBECONFIG=~/.kube/config-pi"'
+      - 'echo "Use: export KUBECONFIG=~/.kube/config-pi"'
+      - 'echo "Or use: KUBECONFIG=~/.kube/config-pi kubectl get nodes"'
 
   # ============================================================================
   # ArgoCD
@@ -235,7 +234,7 @@ tasks:
     desc: Install ArgoCD on the cluster
     cmds:
       - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      - kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
       - echo "Waiting for ArgoCD to be ready..."
       - kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
 
