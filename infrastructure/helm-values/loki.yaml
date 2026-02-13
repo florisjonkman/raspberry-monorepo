@@ -1,8 +1,9 @@
 # Loki Helm values
 # Chart: grafana/loki
 # https://github.com/grafana/loki/tree/main/production/helm/loki
+# Optimized for Raspberry Pi 4 (limited memory)
 
-# Single binary mode - suitable for single node
+# Single binary mode - minimal footprint for single node
 deploymentMode: SingleBinary
 
 loki:
@@ -10,6 +11,7 @@ loki:
 
   commonConfig:
     replication_factor: 1
+    path_prefix: /var/loki
 
   storage:
     type: filesystem
@@ -24,21 +26,31 @@ loki:
           prefix: index_
           period: 24h
 
+  # Disable ruler to avoid ruler-storage initialization
+  rulerConfig:
+    storage:
+      type: local
+      local:
+        directory: /var/loki/rules
+
 singleBinary:
   replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
+      cpu: 50m
+      memory: 128Mi
     limits:
-      cpu: 500m
-      memory: 512Mi
+      cpu: 300m
+      memory: 256Mi
   persistence:
     enabled: true
-    size: 5Gi
+    size: 2Gi
     storageClassName: local-path
+  extraVolumeMounts:
+    - name: data
+      mountPath: /var/loki
 
-# Disable components not needed for single binary mode
+# Disable ALL extra components for minimal memory usage
 backend:
   replicas: 0
 read:
@@ -49,7 +61,13 @@ write:
 gateway:
   enabled: false
 
-# Disable monitoring (we'll use external Prometheus)
+# Disable caches (too memory hungry for Pi)
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+
+# Disable monitoring components
 monitoring:
   selfMonitoring:
     enabled: false
@@ -57,3 +75,7 @@ monitoring:
       installOperator: false
   lokiCanary:
     enabled: false
+
+# Disable ruler completely
+ruler:
+  enabled: false
